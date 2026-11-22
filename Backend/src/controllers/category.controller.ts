@@ -26,8 +26,8 @@ export class CategoryController {
         return;
       }
 
-      const topRatedLimit = req.query.topRated ? parseInt(req.query.topRated as string, 10) : 2;
-      const categoryView = await this.productService.getCategoryView(category, isNaN(topRatedLimit) ? 2 : topRatedLimit);
+      const topRatedLimit = req.query.topRated ? parseInt(req.query.topRated as string, 10) : 5;
+      const categoryView = await this.productService.getCategoryView(category, isNaN(topRatedLimit) ? 5 : topRatedLimit);
       res.json({ data: categoryView });
     } catch (error) {
       next(error);

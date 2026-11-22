@@ -9,7 +9,7 @@ import { EnquiryController } from '../controllers/enquiry.controller';
 import { createProductRouter } from './product.routes';
 import { createCategoryRouter } from './category.routes';
 import { createEnquiryRouter } from './enquiry.routes';
-import { config } from '../config/env';
+import { config, configuredFeaturedIds } from '../config/env';
 
 export interface AppDependencies {
   dataSource?: FakeStoreAdapter;
@@ -23,8 +23,8 @@ export function createApiRouter(deps: AppDependencies = {}): Router {
   const dataSource = deps.dataSource || new FakeStoreAdapter(config.FAKESTORE_API_BASE_URL, config.CACHE_TTL_SECONDS);
   const emailService = deps.emailService || new ConsoleEmailAdapter(config.SALES_EMAIL);
 
-  // Instantiate Services
-  const productService = new ProductService(dataSource);
+  // Instantiate Services with backend-configured featured IDs
+  const productService = new ProductService(dataSource, configuredFeaturedIds);
   const enquiryService = new EnquiryService(dataSource, emailService);
 
   // Instantiate Controllers

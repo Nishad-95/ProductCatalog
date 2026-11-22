@@ -2,23 +2,26 @@
 //  ContentView.swift
 //  ProductCatalog
 //
-//  Created by Nishad Dangui on 22/11/26.
-//
 
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var container: AppContainer
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationStack {
+            HomeView(repository: container.repository)
+                .navigationDestination(for: Product.self) { product in
+                    ProductDetailView(product: product, repository: container.repository)
+                }
+                .navigationDestination(for: String.self) { category in
+                    CategoryListingView(category: category, repository: container.repository)
+                }
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(AppContainer.mock)
 }

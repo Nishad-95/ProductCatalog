@@ -101,7 +101,9 @@ public final class MockProductRepository: ProductRepositoryProtocol, @unchecked 
     public func fetchCategoryView(category: String, topRated: Int = 2) async throws -> CategoryView {
         if shouldThrowError { throw APIError.serverError("Mock error occurred") }
         let all = customProducts ?? Self.sampleProducts
-        let matching = all.filter { $0.category.lowercased() == category.lowercased() }
+        let matching = category.lowercased() == "all"
+            ? all
+            : all.filter { $0.category.lowercased() == category.lowercased() }
         let sorted = matching.sorted { $0.rating.rate > $1.rating.rate }
         let top = Array(sorted.prefix(topRated))
         let topIds = Set(top.map { $0.id })

@@ -139,6 +139,60 @@ struct ProductCatalogTests {
         #expect(enquiryResult.id.hasPrefix("mock_enq_"))
     }
 
+    @MainActor
+    @Test func testHomeViewModelLoadingAndSearch() async {
+        let repo = MockProductRepository()
+        let vm = HomeViewModel(repository: repo)
+
+        #expect(vm.featuredProducts.isEmpty)
+        await vm.loadHomeData()
+        #expect(vm.selectedCategory == "All")
+        #expect(vm.featuredProducts.count == 5)
+        #expect(!vm.categories.isEmpty)
+
+        // Test category switching on Home screen
+        await vm.selectCategory("men's clothing")
+        #expect(vm.selectedCategory == "men's clothing")
+        #expect(!vm.featuredProducts.isEmpty)
+
+        // Test searching
+        await vm.performSearch(query: "backpack")
+        #expect(vm.searchResults.count == 1)
+
+        vm.clearSearch()
+        #expect(vm.searchQuery.isEmpty)
+        #expect(vm.searchResults.isEmpty)
+    }
+
+    @MainActor
+    @Test func testCategoryViewModelPartitioning() async {
+        let repo = MockProductRepository()
+        let vm = CategoryViewModel(category: "men's clothing", repository: repo)
+
+        await vm.loadCategory()
+        #expect(vm.categoryView != nil)
+        #expect(!vm.topRatedProducts.isEmpty)
+    }
+
+    @MainActor
+    @Test func testEnquiryViewModelValidation() async {
+        let sampleProduct = MockProductRepository.sampleProducts[0]
+        let repo = MockProductRepository()
+        let vm = EnquiryViewModel(product: sampleProduct, repository: repo)
+
+        // Invalid initially because name and email are empty
+        #expect(vm.isFormValid == false)
+
+        vm.name = "John Doe"
+        vm.email = "john@example.com"
+        vm.message = "I am interested in this item."
+        #expect(vm.isFormValid == true)
+
+        await vm.submitEnquiry()
+        #expect(vm.submissionResult != nil)
+        #expect(vm.submissionResult?.success == true)
+    }
+
     @Test func testAppConfigurationDefault() {
         let config = AppConfiguration.default
         #expect(config.baseURL.absoluteString.contains("/api/v1"))

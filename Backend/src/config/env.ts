@@ -10,6 +10,7 @@ const envSchema = z.object({
   SALES_EMAIL: z.string().email().default('sales@productcatalog.local'),
   EMAIL_PROVIDER: z.enum(['console', 'mock', 'smtp']).default('console'),
   CACHE_TTL_SECONDS: z.coerce.number().default(300),
+  FEATURED_PRODUCT_IDS: z.string().optional().default('1,2,3,5,11'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -21,3 +22,9 @@ if (!parsed.success) {
 
 export const config = parsed.data;
 export type Config = typeof config;
+
+export const configuredFeaturedIds: number[] = config.FEATURED_PRODUCT_IDS
+  ? config.FEATURED_PRODUCT_IDS.split(',')
+      .map((id) => parseInt(id.trim(), 10))
+      .filter((n) => !isNaN(n))
+  : [1, 2, 3, 5, 11];

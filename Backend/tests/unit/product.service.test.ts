@@ -91,6 +91,14 @@ describe('ProductService (Unit Tests)', () => {
       // 5: id 4 (rate 4.2, count 300)
       expect(featured.map((p) => p.id)).toEqual([3, 5, 2, 1, 4]);
     });
+
+    it('returns exactly configured product IDs when configured on backend', async () => {
+      const customService = new ProductService(mockDataSource, [2, 4, 1, 6, 3]);
+      const featured = await customService.getFeaturedProducts(5);
+
+      expect(featured).toHaveLength(5);
+      expect(featured.map((p) => p.id)).toEqual([2, 4, 1, 6, 3]);
+    });
   });
 
   describe('getCategoryView (Acceptance Criteria: Category Page)', () => {

@@ -35,16 +35,27 @@ export class FakeStoreAdapter implements ProductDataSource {
 
       const products: Product[] = await response.json();
       if (Array.isArray(products) && products.length > 0) {
-        this.cachedProducts = { data: products, timestamp: now };
-        return products;
+        const normalized = products.map((p) => this.normalizeProduct(p));
+        this.cachedProducts = { data: normalized, timestamp: now };
+        return normalized;
       }
       throw new Error('FakeStore returned empty product list');
     } catch (error) {
       console.warn('FakeStore API unreachable or errored. Falling back to built-in seed catalog:', (error as Error).message);
       // Fallback to offline seed catalog for maximum resilience
-      this.cachedProducts = { data: SEED_PRODUCTS, timestamp: now };
-      return SEED_PRODUCTS;
+      const normalizedSeed = SEED_PRODUCTS.map((p) => this.normalizeProduct(p));
+      this.cachedProducts = { data: normalizedSeed, timestamp: now };
+      return normalizedSeed;
     }
+  }
+
+  private normalizeProduct(p: Product): Product {
+    let image = p.image;
+    if (image && image.includes('fakestoreapi.com/img/')) {
+      const filename = image.split('/img/')[1];
+      image = `https://m.media-amazon.com/images/I/${filename}`;
+    }
+    return { ...p, image };
   }
 
   async getProductById(id: number): Promise<Product | null> {

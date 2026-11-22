@@ -2,7 +2,10 @@ import { CategoryView, Product } from '../domain/models/product';
 import { ProductDataSource } from '../domain/ports/product-data-source';
 
 export class ProductService {
-  constructor(private readonly dataSource: ProductDataSource) {}
+  constructor(
+    private readonly dataSource: ProductDataSource,
+    private readonly configuredFeaturedIds: number[] = []
+  ) {}
 
   /**
    * Retrieves all products.
@@ -19,18 +22,45 @@ export class ProductService {
   }
 
   /**
-   * Retrieves the 5 top-rated products to feature on the Home Page.
-   * Sorts products by rating.rate descending, with rating.count as tie-breaker.
+   * Retrieves the exactly 5 featured products to feature on the Home Page.
+   * If configured product IDs are provided by the backend configuration, selects those IDs.
+   * Otherwise (or as fallback), selects the top-rated products.
    */
-  async getFeaturedProducts(limit: number = 5): Promise<Product[]> {
+  async getFeaturedProducts(limit: number = 5, overrideIds?: number[]): Promise<Product[]> {
     const all = await this.dataSource.getAllProducts();
-    const sorted = [...all].sort((a, b) => {
-      if (b.rating.rate !== a.rating.rate) {
-        return b.rating.rate - a.rating.rate;
+    const targetIds = overrideIds || this.configuredFeaturedIds;
+
+    let featured: Product[] = [];
+
+    if (targetIds && targetIds.length > 0) {
+      const productMap = new Map<number, Product>();
+      all.forEach((p) => productMap.set(p.id, p));
+
+      for (const id of targetIds) {
+        const product = productMap.get(id);
+        if (product && !featured.some((p) => p.id === product.id)) {
+          featured.push(product);
+          if (featured.length === limit) break;
+        }
       }
-      return b.rating.count - a.rating.count;
-    });
-    return sorted.slice(0, limit);
+    }
+
+    // If fewer than limit were found from configured IDs, top-up with top-rated products
+    if (featured.length < limit) {
+      const existingIds = new Set(featured.map((p) => p.id));
+      const remainingSorted = [...all]
+        .filter((p) => !existingIds.has(p.id))
+        .sort((a, b) => {
+          if (b.rating.rate !== a.rating.rate) {
+            return b.rating.rate - a.rating.rate;
+          }
+          return b.rating.count - a.rating.count;
+        });
+
+      featured = featured.concat(remainingSorted.slice(0, limit - featured.length));
+    }
+
+    return featured.slice(0, limit);
   }
 
   /**
@@ -41,11 +71,16 @@ export class ProductService {
   }
 
   /**
-   * Retrieves the category view for a specific category:
-   * Splits products into top-rated products for that category and additional products.
+   * Retrieves the category view for a specific category (or 'all' for complete catalogue):
+   * Splits products into top-rated (featured) products for that category (at least 5 if available)
+   * and additional products.
    */
-  async getCategoryView(category: string, topRatedCount: number = 2): Promise<CategoryView> {
-    const products = await this.dataSource.getProductsByCategory(category);
+  async getCategoryView(category: string, topRatedCount: number = 5): Promise<CategoryView> {
+    const isAll = category.trim().toLowerCase() === 'all';
+    const products = isAll
+      ? await this.dataSource.getAllProducts()
+      : await this.dataSource.getProductsByCategory(category);
+
     if (products.length === 0) {
       return {
         category,
