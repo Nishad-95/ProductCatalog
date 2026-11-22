@@ -51,15 +51,84 @@ To satisfy this core requirement, the backend employs **Ports & Adapters (Hexago
 
 ---
 
-## 2. Acceptance Criteria Coverage
+## 2. Acceptance Criteria & Design Assumptions
 
-| Feature | Acceptance Criteria | Backend Implementation |
-| :--- | :--- | :--- |
-| **Home Page** | 5 top-rated products featured on home page | `GET /api/v1/products/featured` (or `?featured=true`) sorts catalog by `rating.rate` desc and `rating.count` desc, returning top 5 products. |
-| **Category Page** | Categories with top-rated products + additional products | `GET /api/v1/categories` lists categories.<br>`GET /api/v1/categories/:category` splits products into `topRated` and `additionalProducts`. |
-| **Search** | Search products matching text query | `GET /api/v1/products/search?q=:query` searches across title, description, and category. |
-| **Product Page** | Detailed product information | `GET /api/v1/products/:id` returns comprehensive product details. |
-| **Enquiry** | Submit contact enquiry, notify sales inbox, thank you response | `POST /api/v1/enquiries` validates input, verifies product exists, dispatches notification via `EmailService`, and returns confirmation. |
+Below is the mapping of each user journey acceptance criteria (AC) to its implementation details and the explicit assumptions made to deliver a robust, user-friendly MVP.
+
+---
+
+### 1. Home Page
+- **Acceptance Criteria**:
+  > **GIVEN** I have chosen 5 products to be "top rated"  
+  > **WHEN** I am viewing the home page  
+  > **THEN** I see those 5 featured products.
+- **Assumptions & Design Decisions**:
+  - **Feed Composition**: The Home screen displays the top 5 featured products in a dedicated featured section, followed by the remaining catalogue products in a 2-column grid.
+  - **Backend-Driven Selection**: Featured products are determined server-side—either configured explicitly by ID via `FEATURED_PRODUCT_IDS` in `.env` or dynamically calculated by highest rating score (`rating.rate`) and review count (`rating.count`). The iOS client never hardcodes or arbitrarily selects featured items.
+  - **Default Category**: The default category filter on app launch is `"All"`, immediately presenting customers with featured items and the full product catalogue.
+
+---
+
+### 2. Category Page & Filtering
+- **Acceptance Criteria**:
+  > **GIVEN** my products are organised into categories  
+  > **WHEN** I click on a category link  
+  > **THEN** I see top rated products for that category  
+  > **AND** I see additional products in that category.
+- **Assumptions & Design Decisions**:
+  - **Default Selection**: Default category is `"All"`. Selecting any specific category filters the view to show top-rated products for that category followed by remaining products in that category.
+  - **Session-Based State**: Category selection is maintained in memory for the duration of the user session. It is intentionally **not persisted across app launches**, ensuring each fresh launch starts cleanly on `"All"`.
+  - **Backend Partitioning**: The backend endpoint (`GET /api/v1/categories/:category`) performs the separation of products into `topRated` (top 5) and `additionalProducts`, keeping business partitioning logic on the server.
+  - **Inline Filtering UX**: On iOS, category chips on the Home screen allow instantaneous category filtering directly on the main feed, while also supporting dedicated category navigation.
+
+---
+
+### 3. Search Experience
+- **Acceptance Criteria**:
+  > **GIVEN** I am looking for a specific product  
+  > **AND** I have entered a search term in the search bar  
+  > **WHEN** I click the search button  
+  > **THEN** I only see products that have text matching that search term.
+- **Assumptions & Design Decisions**:
+  - **Multi-Field Search**: Matching searches across product **title (name)**, **description**, and **category** fields to maximize discovery.
+  - **Interactive & On-Submit**: While clicking the search button / Return key immediately executes the search query as stated in the AC, the UI also features debounced search (300ms) as the customer types, providing an instant feedback loop with dedicated empty/loading states.
+  - **Server-Side Execution**: Search queries are executed server-side via `GET /api/v1/products/search?q=:query` rather than client-side array filtering, ensuring scalability as the catalog grows.
+
+---
+
+### 4. Product Details Page
+- **Acceptance Criteria**:
+  > **GIVEN** I am browsing the products  
+  > **AND** I want to see more details about a specific product  
+  > **WHEN** I click on a product tile  
+  > **THEN** I see the product details page.
+- **Assumptions & Design Decisions**:
+  - **No extra domain assumptions**: Displays full product metadata—high-resolution image, category tag, full title, formatted price (`$XX.XX`), interactive star rating with review count, and full description text.
+  - **Prominent Action**: The page features a prominent floating "Enquire Now" call-to-action button anchored at the bottom of the screen.
+
+---
+
+### 5. Product Enquiry & Notification
+- **Acceptance Criteria**:
+  > **GIVEN** I am viewing a product  
+  > **AND** I am interested in a product  
+  > **AND** I click on the Enquire button  
+  > **AND** I complete the subsequent form with my contact details  
+  > **WHEN** I submit the form  
+  > **THEN** the sales inbox will receive an email  
+  > **AND** the customer will see a "Thank you" message.
+- **Assumptions & Design Decisions**:
+  - **Local Development Simulation (Zero Paid Services)**: Because this project runs locally with no required third-party paid accounts or external API keys, we do not dispatch real SMTP/SES emails during evaluation. Instead, submission performs a backend API call (`POST /api/v1/enquiries`), and `ConsoleEmailAdapter` formats a full email notification to `sales@productcatalog.local` and logs it to `stdout` while retaining it in memory.
+  - **Form Validation**: Customer Name, valid Email address, and Message are mandatory fields. Phone number is optional. The submission button remains disabled until valid inputs are provided.
+  - **Confirmation Feedback**: Upon receiving a `201 Created` response with an enquiry tracking ID (e.g. `enq_1732261948_abc123`), the modal smoothly transitions to a dedicated "Thank You!" confirmation screen with a checkmark and the reference ID.
+  - **Extensible Port**: Swapping the console logger for AWS SES, SendGrid, or Resend requires zero changes to core business logic—only a new class implementing the `EmailService` port.
+
+---
+
+### 6. Additional Technical & Infrastructure Assumptions
+- **Image Resilience & CDN Normalization**: FakeStore API image URLs (`fakestoreapi.com/img/...`) encounter HTTP 403 bot-protection blocks when requested from native iOS clients. Both the backend and client normalize these URLs to Amazon's public CDN origin (`m.media-amazon.com/images/I/...`). Additionally, an offline 20-product seed catalog is bundled so the app functions fully even without external internet access.
+- **Strict Client-Server Isolation**: The iOS client **never** communicates with external data providers directly. All queries, caching, and mutations strictly flow through `http://localhost:3000/api/v1`.
+- **Simulator Networking**: The iOS app targets `http://127.0.0.1:3000/api/v1` with local HTTP transport enabled via `NSAppTransportSecurity` in `Info.plist`.
 
 ---
 
@@ -164,6 +233,42 @@ All responses follow standard JSON envelopes:
 
 ---
 
-## 6. iOS Client Application
+## 6. iOS Client Application ("Catlog")
 
-*(See the `iOS/` directory for the native Swift iOS client implementation).*
+The iOS client is a native SwiftUI application engineered with **MVVM (Model-View-ViewModel)** and Clean Architecture separation:
+
+```text
+iOS/ProductCatalog/ProductCatalog/
+├── Models/              # Codable & Sendable domain entities (Product, CategoryView, Enquiry)
+├── Services/            # Async/await URLSession APIClient & endpoints
+├── Repositories/        # ProductRepository protocol & implementation
+├── Core/                # AppConfiguration, DI Container, Theme tokens
+├── ViewModels/          # HomeViewModel, CategoryViewModel, ProductDetailViewModel, EnquiryViewModel
+├── Views/               # HomeView, CategoryListingView, ProductDetailView, EnquirySheetView
+├── Components/          # AsyncProductImage, ProductCardView, CategoryChipView, RatingBadgeView
+└── Config/
+    └── Info.plist       # NSAppTransportSecurity local HTTP exceptions for simulator
+```
+
+### Running the iOS App in Xcode
+
+1. Ensure the Node.js backend is running on `http://localhost:3000`.
+2. Open the Xcode project:
+   ```bash
+   open iOS/ProductCatalog/ProductCatalog.xcodeproj
+   ```
+3. Select an iOS Simulator (e.g., **iPhone 16** or **iPhone 16 Pro** running iOS 17+).
+4. Press **⌘R** to build and run.
+
+### Running iOS Unit Tests
+
+Tests can be executed directly inside Xcode (**⌘U**) or from the command line:
+
+```bash
+cd iOS/ProductCatalog
+xcodebuild -project ProductCatalog.xcodeproj \
+  -scheme ProductCatalog \
+  -destination 'generic/platform=iOS Simulator' \
+  -only-testing:ProductCatalogTests \
+  -derivedDataPath ./build test
+```
