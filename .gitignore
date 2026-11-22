@@ -18,14 +18,19 @@ yarn-error.log*
 !.env.example
 
 # Xcode / iOS
+build/
+.build/
+DerivedData/
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata/
 *.xcuserdatad
 *.xcscmblueprint
 xcuserdata/
-DerivedData/
-.build/
 *.xcuserstate
 project.xcworkspace/xcuserdata/
 *.ipa
